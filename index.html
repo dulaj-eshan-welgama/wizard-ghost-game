@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wizard Lightning: Ghost Hunter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Metamorphous&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #0a0e1a;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    canvas#gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: none;
+    }
+    video#webcam {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      width: 180px;
+      height: 135px;
+      border-radius: 12px;
+      border: 2px solid rgba(56, 189, 248, 0.6);
+      transform: scaleX(-1);
+      object-fit: cover;
+      z-index: 15;
+      display: none;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+    }
+
+    /* Top HUD */
+    #hud {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      padding: 18px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .score-box {
+      font-size: 42px;
+      font-weight: 900;
+      color: #facc15;
+      text-shadow: 0 3px 0 #854d0e, 0 0 18px rgba(250, 204, 21, 0.5);
+    }
+    .hud-center {
+      display: flex;
+      gap: 12px;
+      pointer-events: auto;
+    }
+    .pill-btn {
+      background: rgba(15, 23, 42, 0.8);
+      border: 2px solid #38bdf8;
+      color: #e0f2fe;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .pill-btn:hover { background: #0284c7; }
+    #comboDisplay {
+      position: fixed; right: 28px; top: 22%;
+      font-size: 40px; font-weight: 900; line-height: 1.05; text-align: right;
+      white-space: pre; color: #facc15; z-index: 10; pointer-events: none;
+      text-shadow: 0 3px 0 #854d0e, 0 0 18px rgba(250, 204, 21, 0.5);
+    }
+    .lives-box {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Overlay Screens */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 11, 25, 0.82);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      text-align: center;
+      padding: 20px;
+      cursor: default;
+    }
+    .hidden { display: none !important; }
+    h1 {
+      font-size: 52px;
+      color: #38bdf8;
+      text-shadow: 0 0 25px rgba(56, 189, 248, 0.8);
+      margin-bottom: 8px;
+    }
+    p.subtitle { color: #cbd5e1; margin-bottom: 24px; font-size: 18px; }
+    .control-toggle {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 26px;
+    }
+    .toggle-btn {
+      padding: 12px 24px;
+      border-radius: 12px;
+      border: 2px solid #475569;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .toggle-btn.active {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.2);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+    .modes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(190px, 230px));
+      gap: 16px;
+    }
+    .mode-card {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border: 2px solid #38bdf8;
+      border-radius: 16px;
+      padding: 22px 16px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .mode-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(56, 189, 248, 0.45);
+    }
+    .mode-card h3 { color: #facc15; font-size: 22px; margin-bottom: 8px; }
+    .mode-card span { color: #cbd5e1; font-size: 14px; line-height: 1.4; display: block; }
+    #statusText { margin-top: 18px; color: #38bdf8; font-weight: 600; min-height: 24px; }
+
+    /* ===== Themed menu & loading scenes ===== */
+    .scene {
+      background: linear-gradient(rgba(8,12,40,0.25), rgba(8,12,40,0.35)), url('./bg.jpeg') center/cover no-repeat;
+      backdrop-filter: none;
+      overflow-x: hidden;
+      overflow-y: auto;
+      justify-content: safe center;
+      font-family: 'Lilita One', 'Segoe UI', sans-serif;
+    }
+    .scene > * { position: relative; z-index: 2; }
+    .deco { position: absolute !important; z-index: 1 !important; pointer-events: none; }
+    .ghost { filter: drop-shadow(0 0 14px rgba(56,189,248,0.7)); }
+    .g1 { width: min(24vw, 40vh); left: -6vw; top: 24%; animation: floaty 5s ease-in-out infinite; }
+    .g2 { width: min(22vw, 36vh); left: -4vw; top: 42%; animation: floaty 6s ease-in-out -2s infinite; }
+    .g3 { width: min(26vw, 42vh); left: 0; top: 60%; animation: floaty 7s ease-in-out -4s infinite; }
+    .wiz { width: min(26vw, 44vh); right: 0; top: 36%; animation: floaty 4s ease-in-out infinite; filter: drop-shadow(0 0 10px rgba(120,230,120,0.5)); }
+    @keyframes floaty { 50% { transform: translateY(-14px); } }
+
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo .bolt { font-size: min(56px, 8vh); filter: drop-shadow(0 0 12px #facc15); }
+    .logo .bolt.flip { transform: scaleX(-1); }
+    #menuOverlay h1 {
+      font-family: 'Lilita One', sans-serif;
+      font-size: min(7.5vw, 13vh);
+      letter-spacing: 2px; margin: 0; line-height: 1;
+      text-shadow: none;
+    }
+    h1 .gold, h1 .blue {
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      -webkit-text-stroke: 3px #1b1f4d;
+      paint-order: stroke fill;
+      filter: drop-shadow(0 5px 0 #0c1030) drop-shadow(0 0 16px rgba(56,189,248,0.45));
+    }
+    h1 .gold { background-image: linear-gradient(#fff3b0, #f5b72c 55%, #b8731a); }
+    h1 .blue { background-image: linear-gradient(#e0f7ff, #3aa8f5 55%, #1752c9); }
+
+    .ribbon {
+      flex-shrink: 0;
+      margin: 2px 0 min(22px, 3.5vh); padding: min(8px, 1vh) 54px;
+      background: linear-gradient(#f7e3b0, #d9b774);
+      border: 3px solid #a37a38; border-radius: 6px;
+      clip-path: polygon(0 0, 100% 0, 96% 50%, 100% 100%, 0 100%, 4% 50%);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.4);
+    }
+    .ribbon span { font-size: min(3vw, 5.5vh); color: #1e2352; letter-spacing: 2px; }
+
+    #menuOverlay .modes-grid { grid-template-columns: repeat(3, min(190px, 26vh, 24vw)); gap: min(40px, 5vh) min(40px, 4vw); margin-top: min(18px, 2.5vh); }
+    .mode-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    #menuOverlay .mode-card {
+      width: 100%; aspect-ratio: 1.3; position: relative;
+      background: linear-gradient(160deg, #6b7a8f, #3b4559);
+      border: 4px solid #9aa7bd; border-radius: 14px;
+      box-shadow: inset 0 0 0 3px #2a3144, 0 0 18px rgba(139,92,246,0.55);
+      display: flex; align-items: center; justify-content: center; padding: 0;
+    }
+    #menuOverlay .mode-card { transition: transform .15s, opacity .15s, box-shadow .15s, border-color .15s; opacity: 0.6; }
+    #menuOverlay .mode-card.selected {
+      opacity: 1; transform: scale(1.1);
+      background: linear-gradient(160deg, #8a7a3a, #4a3f18);
+      border-color: #fde047;
+      box-shadow: inset 0 0 0 3px #7a5c10, 0 0 30px 8px rgba(250,204,21,0.85);
+    }
+    #menuOverlay .mode-card.selected::after {
+      content: "✓ SELECTED"; position: absolute; bottom: -13px; left: 50%; transform: translateX(-50%);
+      background: #facc15; color: #3b2a00; font-size: 12px; padding: 2px 10px; border-radius: 999px; white-space: nowrap;
+    }
+    #menuOverlay .mode-card:hover { opacity: 1; }
+    .mode-wrap:has(.selected) .cap { color: #fde047; }
+    #menuOverlay .mode-card h3 { color: #f6dc9a; font-size: min(2.4vw, 4.2vh); margin: 0; text-align: center; line-height: 1.05; text-shadow: 0 2px 0 #2a3144; }
+    .badge { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 26px; background: #3b4559; border: 3px solid #9aa7bd; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+    .cap { color: #dbeafe; font-size: min(15px, 2.4vh); font-family: 'Segoe UI', sans-serif; font-weight: 600; text-shadow: 0 2px 6px #000; }
+
+    .play-btn {
+      margin: min(22px, 3vh) 0 min(18px, 2.5vh); padding: min(10px, 1vh) 70px; font-family: inherit; font-size: min(34px, 5.5vh); color: #fff;
+      background: linear-gradient(#1d4ed8, #0b2a6b); border: 3px solid #67e8f9; border-radius: 999px;
+      box-shadow: 0 0 22px rgba(103,232,249,0.8); cursor: pointer; transition: transform .15s;
+    }
+    .play-btn:hover { transform: scale(1.08); }
+    #menuOverlay .control-toggle { margin-bottom: 10px; }
+    #menuOverlay .toggle-btn { font-family: 'Segoe UI', sans-serif; border-radius: 999px; font-size: 15px; background: rgba(15,23,42,0.75); }
+    .sound-link { background: none; border: none; color: #dbeafe; font-size: 18px; cursor: pointer; font-family: inherit; }
+    #menuOverlay #statusText { margin-top: 8px; }
+
+    #statsRow { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; margin-top: 10px; color: #fde68a; font-family: 'Segoe UI', sans-serif; font-weight: 600; font-size: 14px; text-shadow: 0 2px 6px #000; }
+    #bestText { white-space: pre-line; color: #fde047; font-size: 22px; margin-bottom: 20px; line-height: 1.5; font-family: 'Lilita One', sans-serif; }
+    /* Loading */
+    .spell-title { font-family: 'Metamorphous', serif; color: #a5f3fc; font-size: clamp(30px, 4.5vw, 58px); letter-spacing: 2px; text-shadow: 0 0 18px rgba(56,189,248,0.9), 0 3px 0 #0b3a5c; }
+    .spell-title.sub { font-size: clamp(26px, 4vw, 50px); margin-top: 6px; }
+    .rune-wrap { position: relative; width: min(34vh, 300px); height: min(34vh, 300px); margin: 14px 0; display: grid; place-items: center; }
+    .rune-ring { position: absolute; inset: 0; border-radius: 50%; border: 4px solid #67e8f9; box-shadow: 0 0 28px #22d3ee, inset 0 0 28px rgba(250,204,21,0.45); }
+    .rune-ring.r1 { animation: spin 8s linear infinite; border-style: dashed; }
+    .rune-ring.r2 { inset: 14%; border-color: #fde68a; box-shadow: 0 0 22px #facc15; animation: spin 5s linear infinite reverse; clip-path: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%); border-radius: 0; border-width: 3px; }
+    .rune-hand { font-size: 74px; filter: drop-shadow(0 0 16px #fde68a); animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 50% { transform: scale(1.12); } }
+    .loading-label { color: #e0f2fe; font-family: 'Segoe UI', sans-serif; letter-spacing: 3px; margin-bottom: 8px; }
+    .bar { position: relative; width: min(62vw, 700px); height: 26px; border: 3px solid #fde68a; border-radius: 999px; background: rgba(8,20,60,0.8); }
+    .bar-fill { height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #0ea5e9, #67e8f9, #fff); box-shadow: 0 0 18px #22d3ee; transition: width .35s ease; }
+    .bar-wiz { position: absolute !important; top: -34px; left: 0; width: 70px; transform: translateX(-50%); transition: left .35s ease; filter: none !important; }
+    .tips { margin-top: 28px; color: #e0f2fe; font-family: 'Segoe UI', sans-serif; font-size: 16px; line-height: 1.6; text-shadow: 0 2px 6px #000; }
+    .f1 { width: 22vw; left: 8vw; top: 55%; } .f2 { width: 24vw; right: 4vw; top: 20%; }
+    .faint { opacity: 0.22; filter: blur(1px); }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <video id="webcam" autoplay playsinline muted></video>
+
+  <div id="hud">
+    <div class="score-box" id="scoreDisplay">0</div>
+    <div class="hud-center">
+      <button class="pill-btn" id="controlSwitchBtn">Control: Hand Gesture</button>
+      <button class="pill-btn" id="soundToggleBtn">Sound: ON</button>
+      <button class="pill-btn" id="menuBtn">Modes</button>
+    </div>
+    <div class="lives-box" id="rightHudDisplay">❤️❤️❤️</div>
+  </div>
+
+  <div id="comboDisplay"></div>
+
+  <!-- Start / Mode Selection Overlay -->
+  <div class="overlay scene" id="menuOverlay">
+    <img class="deco ghost g1" src="./ghost.png" alt="" />
+    <img class="deco ghost g2" src="./ghost.png" alt="" />
+    <img class="deco ghost g3" src="./ghost.png" alt="" />
+    <img class="deco wiz" src="./wizard.png" alt="" />
+
+    <div class="logo">
+      <span class="bolt">⚡</span>
+      <h1><span class="gold">WIZARD</span> <span class="blue">LIGHTNING</span></h1>
+      <span class="bolt flip">⚡</span>
+    </div>
+    <div class="ribbon"><span>GHOST HUNTER</span></div>
+
+    <div class="modes-grid">
+      <div class="mode-wrap">
+        <div class="mode-card selected" data-mode="classic">
+          <div class="badge">❤️❤️🖤</div>
+          <h3>CLASSIC</h3>
+        </div>
+        <span class="cap">3 Lives · Avoid dark orbs</span>
+      </div>
+      <div class="mode-wrap">
+        <div class="mode-card" data-mode="arcade">
+          <div class="badge">⏱️</div>
+          <h3>TIME<br>ATTACK</h3>
+        </div>
+        <span class="cap">60 Seconds · Big combos</span>
+      </div>
+      <div class="mode-wrap">
+        <div class="mode-card" data-mode="zen">
+          <div class="badge">🔮</div>
+          <h3>ZEN</h3>
+        </div>
+        <span class="cap">90 Seconds · No bombs</span>
+      </div>
+    </div>
+
+    <button class="play-btn" id="playBtn">Play</button>
+
+    <div class="control-toggle">
+      <button class="toggle-btn active" id="selectHandBtn">✋ HAND GESTURE CONTROL</button>
+      <button class="toggle-btn" id="selectMouseBtn">🖱️ MOUSE / TOUCH</button>
+    </div>
+    <button class="sound-link" id="soundMenuBtn">Sound: ON</button>
+    <div id="statsRow"></div>
+    <div id="statusText"></div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="overlay scene hidden" id="loadingOverlay">
+    <img class="deco ghost faint f1" src="./ghost.png" alt="" />
+    <img class="deco ghost faint f2" src="./ghost.png" alt="" />
+    <h2 class="spell-title">CASTING SPELLS...</h2>
+    <div class="rune-wrap">
+      <div class="rune-ring r1"></div>
+      <div class="rune-ring r2"></div>
+      <div class="rune-hand">☝️</div>
+    </div>
+    <h2 class="spell-title sub" id="loadingMsg">CONNECTING TO CAMERA...</h2>
+    <div class="loading-label">LOADING</div>
+    <div class="bar">
+      <div class="bar-fill" id="barFill"></div>
+      <img class="bar-wiz" id="barWiz" src="./wizard.png" alt="" />
+    </div>
+    <div class="tips">
+      <div>TIP: Make sure you’re in a well-lit area for hand tracking!</div>
+      <div>TIP: Use swift swipes to zap multiple ghosts for a combo!</div>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="overlay hidden" id="gameOverOverlay">
+    <h1>GAME OVER</h1>
+    <p class="subtitle" id="finalScoreText">Final Score: 0</p>
+    <p id="bestText"></p>
+    <button class="play-btn" id="restartBtn">Play Again</button>
+    <p class="subtitle" style="margin-top:14px;font-size:14px">Press Enter to go again</p>
+  </div>
+
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
