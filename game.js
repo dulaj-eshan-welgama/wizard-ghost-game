@@ -10,7 +10,6 @@ const video = document.getElementById("webcam");
 // UI Elements
 const scoreDisplay = document.getElementById("scoreDisplay");
 const rightHudDisplay = document.getElementById("rightHudDisplay");
-const controlSwitchBtn = document.getElementById("controlSwitchBtn");
 const soundToggleBtn = document.getElementById("soundToggleBtn");
 const menuBtn = document.getElementById("menuBtn");
 const menuOverlay = document.getElementById("menuOverlay");
@@ -71,6 +70,9 @@ function resize() {
   canvas.height = window.innerHeight;
 }
 window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => setTimeout(resize, 200));
+const portraitMQ = window.matchMedia("(orientation: portrait) and (max-width: 900px)");
+const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
 resize();
 
 // --- GAME STATE ---
@@ -100,9 +102,27 @@ const bgMusic = new Audio("./bg-sound.mp3");
 bgMusic.loop = true;
 bgMusic.volume = 0.4;
 function syncMusic() {
-  if (soundEnabled && isPlaying) bgMusic.play().catch(() => {});
+  // Music plays on every screen (menu, loading, game) unless sound is off
+  if (soundEnabled && !document.hidden) bgMusic.play().catch(() => {});
   else bgMusic.pause();
 }
+// Browsers block autoplay: start the music on the first tap/click/key
+["pointerdown", "keydown", "touchstart"].forEach((ev) =>
+  window.addEventListener(ev, () => syncMusic(), { once: true })
+);
+document.addEventListener("visibilitychange", syncMusic);
+setTimeout(syncMusic, 0);
+
+// --- ICONS ---
+const ICONS = {
+  soundOn: '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3z"/><path d="M15.5 8.5a5 5 0 010 7M18 6a8.5 8.5 0 010 12" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>',
+  soundOff: '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3z"/><path d="M16 9l5 6M21 9l-5 6" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>',
+  home: '<svg viewBox="0 0 24 24"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg>',
+  play: '<svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>',
+  restart: '<svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a5 5 0 11-5 5H4a8 8 0 108-8z"/></svg>'
+};
+document.querySelectorAll("[data-icon]").forEach((el) => (el.innerHTML = ICONS[el.dataset.icon]));
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const boomAudio = new Audio("./boom.mp3");
@@ -222,19 +242,21 @@ window.addEventListener("mousemove", (e) => {
   pointer.active = true;
 });
 
-window.addEventListener("touchmove", (e) => {
+function onTouch(e) {
   if (controlMode !== "mouse" || !e.touches[0]) return;
+  if (e.target === canvas) e.preventDefault(); // stop page scroll / pull-to-refresh while playing
   targetPointer.x = e.touches[0].clientX;
   targetPointer.y = e.touches[0].clientY;
   pointer.active = true;
-}, { passive: true });
+}
+window.addEventListener("touchstart", onTouch, { passive: false });
+window.addEventListener("touchmove", onTouch, { passive: false });
 
 // --- UI EVENT LISTENERS ---
 function setControlMode(mode) {
   controlMode = mode;
   selectHandBtn.classList.toggle("active", mode === "hand");
   selectMouseBtn.classList.toggle("active", mode === "mouse");
-  controlSwitchBtn.textContent = mode === "hand" ? "Control: Hand Gesture" : "Control: Mouse";
 
   if (mode === "mouse") {
     stopCameraView();
@@ -249,22 +271,67 @@ function setControlMode(mode) {
 
 selectHandBtn.onclick = () => setControlMode("hand");
 selectMouseBtn.onclick = () => setControlMode("mouse");
-controlSwitchBtn.onclick = () => setControlMode(controlMode === "hand" ? "mouse" : "hand");
+if (isTouchDevice) setControlMode("mouse"); // touch is the natural default on phones
 
-soundToggleBtn.onclick = () => {
+function toggleSound() {
   soundEnabled = !soundEnabled;
-  soundToggleBtn.textContent = soundMenuBtn.textContent = soundEnabled ? "Sound: ON" : "Sound: OFF";
+  soundToggleBtn.innerHTML = soundMenuBtn.innerHTML = soundEnabled ? ICONS.soundOn : ICONS.soundOff;
   syncMusic();
-};
+}
+soundToggleBtn.innerHTML = soundMenuBtn.innerHTML = ICONS.soundOn;
+soundToggleBtn.onclick = soundMenuBtn.onclick = toggleSound;
 
-menuBtn.onclick = () => {
+// --- PAUSE ---
+let paused = false;
+const pauseBtn = document.getElementById("pauseBtn");
+const pauseOverlay = document.getElementById("pauseOverlay");
+const gameBtns = document.getElementById("gameBtns");
+pauseBtn.innerHTML = ICONS.pause;
+function setPaused(p) {
+  paused = p;
+  pauseOverlay.classList.toggle("hidden", !p);
+  pauseBtn.innerHTML = p ? ICONS.play : ICONS.pause;
+}
+function togglePause() { if (isPlaying) setPaused(!paused); }
+pauseBtn.onclick = togglePause;
+document.getElementById("resumeBtn").onclick = () => setPaused(false);
+document.getElementById("pauseRestartBtn").onclick = () => { setPaused(false); startGame(gameMode); };
+window.addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "p" || e.key === "P") togglePause(); });
+
+function goHome() {
   isPlaying = false;
+  setPaused(false);
+  gameBtns.classList.add("hidden");
+  ghosts = [];
+  particles = [];
+  floatingTexts = [];
+  trail = [];
+  comboCount = 0;
+  comboDisplay.textContent = "";
+  stopCameraView();
   menuOverlay.classList.remove("hidden");
   gameOverOverlay.classList.add("hidden");
+  loadingOverlay.classList.add("hidden");
+  updateMenuStats();
   syncMusic();
-};
+}
+menuBtn.onclick = goHome;
+document.getElementById("homeBtn2").onclick = goHome;
 
-soundMenuBtn.onclick = () => soundToggleBtn.onclick();
+// Rotate + fullscreen on tap (browsers only allow this from a user click)
+const rotateHint = document.getElementById("rotateHint");
+async function enterLandscape() {
+  try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); } catch (e) {}
+  try {
+    await screen.orientation.lock("landscape");
+    rotateHint.textContent = "";
+  } catch (e) {
+    rotateHint.textContent = "This browser can't lock rotation. Turn off your phone's rotation lock and turn the phone sideways.";
+  }
+}
+document.getElementById("rotateBtn").onclick = enterLandscape;
+document.getElementById("fsBtn").onclick = enterLandscape;
+
 
 document.querySelectorAll(".mode-card").forEach((card) => {
   card.onclick = () => {
@@ -313,6 +380,8 @@ async function startGame(selectedMode) {
   trail = [];
   comboCount = 0;
   isPlaying = true;
+  setPaused(false);
+  gameBtns.classList.remove("hidden");
   comboDisplay.textContent = "";
   syncMusic();
 
@@ -335,6 +404,8 @@ function updateHud() {
 function triggerGameOver() {
   if (!isPlaying) return;
   isPlaying = false;
+  setPaused(false);
+  gameBtns.classList.add("hidden");
   finalScoreText.textContent = `Mode: ${gameMode.toUpperCase()} | Final Score: ${score}`;
   const prev = save.best[gameMode] || 0;
   if (score > prev) {
@@ -423,6 +494,8 @@ let lastVideoTime = -1;
 
 function loop(now) {
   requestAnimationFrame(loop);
+  const blocked = portraitMQ.matches; // paused while phone is in portrait
+  if (blocked || paused) lastTimerTick = now;
 
   // 1. Hand Tracking Update
   if (isPlaying && controlMode === "hand" && handLandmarker && video.readyState >= 2) {
@@ -512,7 +585,7 @@ function loop(now) {
   }
 
   // 3. Game Logic Update
-  if (isPlaying) {
+  if (isPlaying && !blocked && !paused) {
     if (gameMode !== "classic") {
       timeLeft -= (now - lastTimerTick) / 1000;
       lastTimerTick = now;

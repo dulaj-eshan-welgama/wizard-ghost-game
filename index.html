@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0a0e1a" />
+  <link rel="manifest" href="./manifest.json" />
   <title>Wizard Lightning: Ghost Hunter</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Metamorphous&display=swap" rel="stylesheet" />
@@ -15,6 +19,9 @@
       overflow: hidden;
       width: 100vw;
       height: 100vh;
+      height: 100dvh;
+      touch-action: none;
+      overscroll-behavior: none;
     }
     canvas#gameCanvas {
       display: block;
@@ -25,7 +32,7 @@
     video#webcam {
       position: fixed;
       bottom: 16px;
-      right: 16px;
+      left: 16px;
       width: 180px;
       height: 135px;
       border-radius: 12px;
@@ -235,6 +242,47 @@
 
     #statsRow { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; margin-top: 10px; color: #fde68a; font-family: 'Segoe UI', sans-serif; font-weight: 600; font-size: 14px; text-shadow: 0 2px 6px #000; }
     #bestText { white-space: pre-line; color: #fde047; font-size: 22px; margin-bottom: 20px; line-height: 1.5; font-family: 'Lilita One', sans-serif; }
+    /* ===== Mobile / small screens ===== */
+    .overlay { height: 100vh; height: 100dvh; }
+    #rotateOverlay {
+      display: none; position: fixed; inset: 0; z-index: 100; background: #070b19;
+      flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px;
+      font-family: 'Lilita One', 'Segoe UI', sans-serif; color: #a5f3fc;
+    }
+    #rotateOverlay .phone {
+      width: 64px; height: 108px; border: 5px solid #67e8f9; border-radius: 14px; margin-bottom: 26px;
+      box-shadow: 0 0 20px #22d3ee; animation: rot 2.2s ease-in-out infinite;
+    }
+    @keyframes rot { 0%, 15% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
+    #rotateOverlay h2 { font-size: 30px; margin-bottom: 8px; }
+    #rotateOverlay p { color: #cbd5e1; font-family: 'Segoe UI', sans-serif; }
+    @media (orientation: portrait) and (max-width: 900px) { #rotateOverlay { display: flex; } }
+
+    @media (max-height: 520px) {
+      #hud { padding: 8px 14px; padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+      .score-box { font-size: 26px; }
+      .lives-box { font-size: 20px; letter-spacing: 3px; }
+      .pill-btn { padding: 5px 10px; font-size: 11px; }
+      .hud-center { gap: 6px; }
+      #comboDisplay { font-size: 22px; right: 14px; }
+      video#webcam { width: 100px; height: 75px; bottom: 8px; left: 8px; }
+      .toggle-btn { padding: 6px 12px !important; font-size: 12px !important; }
+      #statsRow { font-size: 11px; gap: 12px; margin-top: 4px; }
+      .sound-link { font-size: 13px; }
+      .cap { display: none; }
+      .badge { font-size: 18px !important; top: -16px; }
+      .logo .bolt { display: none; }
+      .tips { font-size: 12px; margin-top: 10px; }
+      .rune-wrap { width: 26vh; height: 26vh; margin: 6px 0; }
+      .rune-hand { font-size: 40px; }
+      #bestText { font-size: 16px; margin-bottom: 10px; }
+      .overlay h1 { font-size: 34px; }
+      #gameOverOverlay .subtitle { margin-bottom: 8px; font-size: 14px; }
+    }
+    .rot-btn { margin: 22px 0 10px; font-size: 22px; padding: 10px 34px; }
+    .rot-hint { max-width: 320px; font-size: 14px; color: #fca5a5 !important; }
+    .touch-only { display: none; }
+    @media (pointer: coarse) { .touch-only { display: inline-block; } }
     /* Loading */
     .spell-title { font-family: 'Metamorphous', serif; color: #a5f3fc; font-size: clamp(30px, 4.5vw, 58px); letter-spacing: 2px; text-shadow: 0 0 18px rgba(56,189,248,0.9), 0 3px 0 #0b3a5c; }
     .spell-title.sub { font-size: clamp(26px, 4vw, 50px); margin-top: 6px; }
@@ -252,26 +300,70 @@
     .tips { margin-top: 28px; color: #e0f2fe; font-family: 'Segoe UI', sans-serif; font-size: 16px; line-height: 1.6; text-shadow: 0 2px 6px #000; }
     .f1 { width: 22vw; left: 8vw; top: 55%; } .f2 { width: 24vw; right: 4vw; top: 20%; }
     .faint { opacity: 0.22; filter: blur(1px); }
+
+    /* ===== Icon buttons ===== */
+    .icon-btn {
+      width: min(54px, 11vh); height: min(54px, 11vh); border-radius: 14px; border: 3px solid rgba(255,255,255,0.85);
+      display: grid; place-items: center; cursor: pointer; padding: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,255,255,0.45); transition: transform .12s;
+    }
+    .icon-btn:hover { transform: scale(1.1); }
+    .icon-btn:active { transform: scale(0.94); }
+    .icon-btn svg { width: 100%; height: 100%; fill: #fff; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.35)); }
+    .icon-btn.purple { background: linear-gradient(#a78bfa, #6d28d9); }
+    .icon-btn.orange { background: linear-gradient(#fdba4d, #ea7a0c); }
+    .icon-btn.red { background: linear-gradient(#f87171, #b91c1c); }
+    .icon-btn.big {
+      width: min(110px, 22vh); height: min(110px, 22vh); border-radius: 22px; padding: 22px;
+      background: linear-gradient(#5a5a5a, #1c1c1c); border-color: #2b2b2b;
+    }
+    .big-row { display: flex; gap: min(40px, 6vw); margin-top: 18px; }
+    #gameBtns { position: fixed; right: 14px; bottom: 14px; z-index: 25; display: flex; flex-direction: column; gap: 10px; }
+    .menu-snd { position: absolute !important; top: 14px; right: 14px; z-index: 5; }
+    @media (max-height: 520px) {
+      #gameBtns { right: 8px; bottom: 8px; gap: 6px; }
+      .menu-snd { top: 8px; right: 8px; }
+    }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
+
+  <div id="rotateOverlay">
+    <div class="phone"></div>
+    <h2>Rotate your phone</h2>
+    <p>Wizard Lightning is played in landscape mode.</p>
+    <button class="play-btn rot-btn" id="rotateBtn">⟳ Rotate &amp; Fullscreen</button>
+    <p id="rotateHint" class="rot-hint"></p>
+  </div>
   <video id="webcam" autoplay playsinline muted></video>
 
   <div id="hud">
     <div class="score-box" id="scoreDisplay">0</div>
-    <div class="hud-center">
-      <button class="pill-btn" id="controlSwitchBtn">Control: Hand Gesture</button>
-      <button class="pill-btn" id="soundToggleBtn">Sound: ON</button>
-      <button class="pill-btn" id="menuBtn">Modes</button>
-    </div>
     <div class="lives-box" id="rightHudDisplay">❤️❤️❤️</div>
+  </div>
+
+  <!-- In-game icon buttons (bottom right, vertical) -->
+  <div id="gameBtns" class="hidden">
+    <button class="icon-btn purple" id="soundToggleBtn" aria-label="Sound"></button>
+    <button class="icon-btn red" id="menuBtn" data-icon="home" aria-label="Home"></button>
+    <button class="icon-btn orange" id="pauseBtn" aria-label="Pause"></button>
   </div>
 
   <div id="comboDisplay"></div>
 
+  <!-- Pause Overlay -->
+  <div class="overlay scene hidden" id="pauseOverlay">
+    <h2 class="spell-title">PAUSED</h2>
+    <div class="big-row">
+      <button class="icon-btn big" id="resumeBtn" data-icon="play" aria-label="Resume"></button>
+      <button class="icon-btn big" id="pauseRestartBtn" data-icon="restart" aria-label="Restart"></button>
+    </div>
+  </div>
+
   <!-- Start / Mode Selection Overlay -->
   <div class="overlay scene" id="menuOverlay">
+    <button class="icon-btn purple menu-snd" id="soundMenuBtn" aria-label="Sound"></button>
     <img class="deco ghost g1" src="./ghost.png" alt="" />
     <img class="deco ghost g2" src="./ghost.png" alt="" />
     <img class="deco ghost g3" src="./ghost.png" alt="" />
@@ -314,7 +406,8 @@
       <button class="toggle-btn active" id="selectHandBtn">✋ HAND GESTURE CONTROL</button>
       <button class="toggle-btn" id="selectMouseBtn">🖱️ MOUSE / TOUCH</button>
     </div>
-    <button class="sound-link" id="soundMenuBtn">Sound: ON</button>
+    
+    <button class="sound-link touch-only" id="fsBtn">⛶ Fullscreen Landscape</button>
     <div id="statsRow"></div>
     <div id="statusText"></div>
   </div>
@@ -346,8 +439,10 @@
     <h1>GAME OVER</h1>
     <p class="subtitle" id="finalScoreText">Final Score: 0</p>
     <p id="bestText"></p>
-    <button class="play-btn" id="restartBtn">Play Again</button>
-    <p class="subtitle" style="margin-top:14px;font-size:14px">Press Enter to go again</p>
+    <div class="big-row">
+      <button class="icon-btn big" id="restartBtn" data-icon="restart" aria-label="Play again"></button>
+      <button class="icon-btn big" id="homeBtn2" data-icon="home" aria-label="Home"></button>
+    </div>
   </div>
 
   <script type="module" src="./game.js"></script>
